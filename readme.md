@@ -1,5 +1,7 @@
 # Context-Aware Adaptive Authentication System
 
+![System Architecture](https://github.com/liviaellen/login_deconflict/blob/365c20f3284f57baf854202def65896e15d34f3c/image.png)
+
 ## 1. High-Level Architecture
 
 The system augments the traditional username/password flow with a **Risk Engine** that evaluates every request context.
