@@ -1,83 +1,55 @@
-## Take-Home Assignment
+# Context-Aware Adaptive Authentication System
 
-### Secure, Low-Friction Access for Sensitive Users
+## 1. High-Level Architecture
 
-**Context**
-We build software used by law enforcement agencies and private-sector partners to handle highly sensitive data. Account takeover is a critical risk for us.
+The system augments the traditional username/password flow with a **Risk Engine** that evaluates every request context.
 
-Today we have:
-• Username/password login
-• Optional 2-factor authentication (2FA)
+```mermaid
+graph TD
+    Client[User Client / Browser] -->|Login Credentials + Context| AuthService[Auth Service]
+    AuthService -->|Context Signals| RiskEngine[Risk Engine]
+    RiskEngine -->|Risk Score & Decision| AuthService
 
-We want something meaningfully more secure than this, without adding heavy friction for legitimate users.
+    subgraph Decisions
+    RiskEngine -->|Low Risk| Allow[ALLOW: Issue Token]
+    RiskEngine -->|Medium Risk| Challenge[CHALLENGE: Require MFA]
+    RiskEngine -->|High Risk| Block[BLOCK: Deny Access]
+    end
+```
 
-**Task**
-Design and implement a system that makes access to our platform significantly harder to compromise than basic login + optional 2FA, while keeping the day-to-day experience as smooth as possible for normal users.
+### Components
+1.  **Auth Service**: Entry point for user credentials. It collects "Context Signals" from the request (IP, Device Fingerprint, User Agent, Timestamp).
+2.  **Risk Engine**: The brain of the security layer. It compares current signals against the user's historical profile and global rules.
 
-You can approach this however you like:
-• System design only
-• Rules-based security logic
-• Machine learning or anomaly detection
-• Any combination of the above
+## 2. Risk Evaluation Logic
 
-Using real or synthetic data is optional. If you want to demonstrate or simulate behavior with data, that’s great but not required.
+The Risk Engine calculates a **Risk Score (0-100)** based on weighted signals.
 
-**Requirements**
-Your solution should:
+### Key Factors
+| Factor | Description | Weight (Example) |
+| :--- | :--- | :--- |
+| **New Device** | Device ID not seen in user history. | +30 |
+| **Impossible Travel** | Login location distance / time > realistic speed. | +80 |
+| **IP Reputation** | Known bad IP or Tor exit node. | +50 |
+| **Velocity** | Too many attempts in short time. | +40 |
+| **ML/Anomaly** | Unsupervised model flags event as outlier. | +35 |
 
-1. Improve Security Beyond Basic Login
-   ◦ Show how your design makes account takeover harder than simple username/password (+ optional 2FA).
-   ◦ Consider both login and active sessions (not just the first login step).
+### Hybrid Approach (Rules + ML)
+The final risk score is a combination of:
+1.  **Deterministic Rules**: Explicit violations (velocity, blacklist).
+2.  **Probabilistic ML**: Behavioral anomalies (e.g., user suddenly logging in at 3 AM from a new OS version, which individually might be fine but together are odd).
 
-2. Minimize User Friction
-   ◦ Clearly explain when a user has a smooth, no-extra-steps experience.
-   ◦ Explain when and why additional checks or friction are introduced.
+### Thresholds
+- **Low Risk (0-20)**: **Frictionless**. Standard login succeeds immediately.
+- **Medium Risk (21-70)**: **Step-up**. Request 2FA/OTP.
+- **High Risk (>70)**: **Block**. Reject login, alert support.
 
-3. Support Risk-Aware Behavior (Design-Choice)
-   ◦ You may choose to:
-   ▪ Use rules (e.g., certain conditions trigger extra checks), and/or
-   ▪ Use ML / scoring / anomaly detection.
-   ◦ We’re interested in how you’d structure this, not in any specific algorithm.
+## 3. Security vs. Friction
 
-4. Be Practical to Implement
-   ◦ Think about how this would fit into a real product:
-   ▪ Where does this logic live?
-   ▪ How does it talk to the existing auth system?
-   ▪ How would it evolve over time?
+### How we improve Security
+- **Credential Stuffing Defense**: Even if an attacker has the password, they likely don't have the user's device or typical IP/Location profile. This triggers a specific challenge or block.
+- **Session Protection**: We can re-evaluate risk on sensitive actions (e.g., "Change Password") using the same engine, not just at login.
 
-**What to Deliver**
-
-1. Short Design Document (2–3 pages max)
-   ◦ A high-level architecture diagram showing:
-   ▪ Existing auth / login
-   ▪ Your additional security layer
-   ▪ Any data you would store or process
-   ◦ A brief description of:
-   ▪ The main components
-   ▪ How they interact
-   ▪ The key ideas behind your approach
-   ◦ A short “security vs friction” section:
-   ▪ How your design improves security
-   ▪ Where users might see friction and why that trade-off is acceptable
-
-2. Code (minimal / optional)
-   ◦ A small backend service (language/framework of your choice) that:
-   ▪ Exposes an endpoint (or set of endpoints) that demonstrates your idea, e.g.:
-   ▪ Simulated login or session events
-   ▪ A decision about whether to allow, block, or add extra checks
-   ◦ You can mock or stub anything that isn’t central to your design.
-
-3. Optional: Demo or Data
-   ◦ This is not required, but you may optionally include:
-   ▪ A minimal UI (web page, CLI, or notebook) that shows the flow.
-   ▪ Any simple empirical or simulated demonstration that:
-   ▪ Compares your approach to a basic login + optional 2FA baseline, and/or
-   ▪ Illustrates how your system behaves in a few example scenarios.
-
-**Evaluation**
-We will look for:
-• Security thinking: Does your design meaningfully improve resistance to account takeover?
-• Friction awareness: Are the user experience trade-offs thoughtfully handled and justified?
-• System design: Is the architecture clear, modular, and realistic?
-• Implementation quality: Is the code organized, readable, and aligned with your design?
-• (Optional) Use of data/ML: If you choose to use data or ML, is it used thoughtfully and explained clearly?
+### Handling Friction
+- **The "Happy Path"**: A user logging in from their company laptop at their usual office gets **ZERO** additional friction. No 2FA prompt every single time.
+- **Justified Friction**: Users only see extra steps when *we* are unsure. Most users accept a 2FA prompt when logging in from a new phone or a coffee shop in a different city as a reasonable security measure.
