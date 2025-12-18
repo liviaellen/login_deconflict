@@ -112,6 +112,33 @@ async def login(request: Request):
 
     return response
 
+@app.post("/sensitive-action")
+async def sensitive_action(request: Request):
+    """
+    Demonstrates 'Session Protection'.
+    Even if the user is logged in, high-risk context triggers a challenge or block
+    for sensitive operations (e.g., Wire Transfer, Export Data).
+    """
+    data = await request.json()
+    username = data.get('username')
+    context = data.get('context', {})
+
+    # Re-evaluate risk at the moment of the action
+    risk_score, reasons = risk_engine.calculate_risk(username, context)
+
+    if risk_score > 70:
+        return JSONResponse(
+            status_code=403,
+            content={"status": "block", "message": "Action blocked due to extreme risk", "reasons": reasons}
+        )
+    elif risk_score > 40: # Lower threshold for sensitive actions
+        return JSONResponse(
+            status_code=202,
+            content={"status": "challenge", "message": "MFA required for this sensitive action", "reasons": reasons}
+        )
+
+    return {"status": "allow", "message": "Sensitive action performed successfully"}
+
 @app.post("/verify-challenge")
 async def verify_challenge(request: Request):
     data = await request.json()

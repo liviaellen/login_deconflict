@@ -32,7 +32,7 @@ The Risk Engine calculates a **Risk Score (0-100)** based on weighted signals.
 | **Impossible Travel** | Login location distance / time > realistic speed. | +80 |
 | **IP Reputation** | Known bad IP or Tor exit node. | +50 |
 | **Velocity** | Too many attempts in short time. | +40 |
-| **ML/Anomaly** | Unsupervised model (Isolation Forest) flags event as outlier. | +35 |
+| **ML/Anomaly** | Unsupervised model flags event as outlier. | +35 |
 
 ### Hybrid Approach (Rules + ML)
 The final risk score is a combination of:
@@ -53,3 +53,22 @@ The final risk score is a combination of:
 ### Handling Friction
 - **The "Happy Path"**: A user logging in from their company laptop at their usual office gets **ZERO** additional friction. No 2FA prompt every single time.
 - **Justified Friction**: Users only see extra steps when *we* are unsure. Most users accept a 2FA prompt when logging in from a new phone or a coffee shop in a different city as a reasonable security measure.
+
+## 4. Technical Deep Dive
+
+### Session Protection Implementation
+Beyond the initial login, the system protects high-value actions (e.g., `Export Data`, `Admin Access`).
+1. **Middleware Hook**: On every sensitive request, the frontend sends current context signals.
+2. **Re-Evaluation**: The Risk Engine runs the same score calculation.
+3. **Challenge/Block**: If the context has shifted (e.g., VPN toggled on, new IP), the user is challenged mid-session.
+
+### Data Model & Persistence
+| Data Type | Storage | Usage |
+| :--- | :--- | :--- |
+| **User Signals** | Redis | Ephemeral session context, velocity counters. |
+| **History** | Postgres | Long-term login patterns, device fingerprinting. |
+| **Audit Logs** | Elastic | Compliance and security forensic reporting. |
+
+### Future-Proofing & Evolution
+- **Continuous Training**: The Isolation Forest model is retrained on the latest 30 days of "Allow" logs to minimize false positives as user habits change (e.g. shift to remote work).
+- **Signal Expansion**: Future versions will include Browser Fingerprinting (Canvas/Audio), Keyboard cadence, and Behavioral Biometrics.

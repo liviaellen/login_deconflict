@@ -29,6 +29,30 @@ def test_scenario(name, username, password, context, expected_status):
         print(f"Error: {e}")
         return None
 
+def test_sensitive_action(name, username, context, expected_status):
+    print(f"\n--- Sensitive Action Scenario: {name} ---")
+    payload = {
+        "username": username,
+        "context": context
+    }
+
+    try:
+        response = requests.post(f"{BASE_URL}/sensitive-action", json=payload)
+        data = response.json()
+
+        print(f"Request Context: {context}")
+        print(f"Response: {data}")
+
+        if data.get("status") == expected_status:
+            print("RESULT: PASS ✅")
+        else:
+            print(f"RESULT: FAIL ❌ (Expected {expected_status}, got {data.get('status')})")
+
+        return data
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
 def main():
     # Wait for server to start
     time.sleep(2)
@@ -93,6 +117,22 @@ def main():
             {"device_id": "device_C", "ip": "3.3.3.3", "hour": 14},
             expected
         )
+
+    # 6. Session Protection (Sensitive Action)
+    # Even if logged in, a sudden IP change or unusual time for a sensitive action triggers risk rules.
+    test_sensitive_action(
+        "Sensitive Action: Mid-Session IP Change (Should Block)",
+        "alice",
+        {"device_id": "device_A", "ip": "1.2.3.4", "hour": 14}, # 1.2.3.4 is a 'Bad IP'
+        "block"
+    )
+
+    test_sensitive_action(
+        "Sensitive Action: Unusual Time (Should Challenge)",
+        "alice",
+        {"device_id": "device_A", "ip": "192.168.1.1", "hour": 3}, # 3 AM is outlier
+        "challenge"
+    )
 
 if __name__ == "__main__":
     main()
